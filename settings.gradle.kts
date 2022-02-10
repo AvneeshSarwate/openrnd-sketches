@@ -1,8 +1,8 @@
 enableFeaturePreview("VERSION_CATALOGS")
 rootProject.name = "openrndr-template"
 
-val openrndrUseSnapshot = false
-val orxUseSnapshot = false
+val openrndrUseSnapshot = true
+val orxUseSnapshot = true
 val ormlUseSnapshot = true
 
 dependencyResolutionManagement {
@@ -48,5 +48,6 @@ pluginManagement {
     repositories {
         mavenLocal()
         gradlePluginPortal()
+        maven(url="https://oss.sonatype.org/content/repositories/snapshots/")
     }
 }
