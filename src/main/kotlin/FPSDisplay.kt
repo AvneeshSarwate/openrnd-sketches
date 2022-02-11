@@ -28,6 +28,7 @@ class FPSDisplay : Extension {
         }
         drawer.isolated {
             // -- set view and projections
+            drawer.shadeStyle = null
             drawer.view = Matrix44.IDENTITY
             drawer.stroke = ColorRGBa.GREEN
             drawer.strokeWeight = 10.0

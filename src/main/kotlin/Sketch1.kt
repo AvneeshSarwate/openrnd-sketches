@@ -50,15 +50,15 @@ fun main(args: Array<String>) {
                 var pos = AnimatedPosition(x, y)
                 var rad = AnimatedRadius()
 
-                fun update() {
+                fun update(delay: Long) {
                     pos.updateAnimation()
                     rad.updateAnimation()
                     if(!pos.hasAnimations()) {
-                        pos.delay(1000)
+                        if(delay > 0) pos.delay(delay)
                         pos.square()
                     }
                     if(!rad.hasAnimations()) {
-                        rad.delay(1000)
+                        if(delay > 0) rad.delay(delay)
                         rad.radiusChange()
                     }
                 }
@@ -73,12 +73,12 @@ fun main(args: Array<String>) {
 
             val numCircles = 1
             val animatedCircles = List(numCircles) { PosRad(0.0, 0.0) }
-
+            animatedCircles.forEach { ac -> ac.update(1000) }
             extend {
                 drawer.clear(ColorRGBa.BLACK)
                 drawer.fill = ColorRGBa.PINK
                 drawer.stroke = null
-                animatedCircles.forEach { ac -> ac.update() }
+                animatedCircles.forEach { ac -> ac.update(0) }
                 drawer.circles {
                     animatedCircles.forEach { ac -> circle(ac.x, ac.y, ac.radius) }
                 }
