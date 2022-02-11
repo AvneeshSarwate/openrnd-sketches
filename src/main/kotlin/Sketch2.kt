@@ -4,9 +4,7 @@ import org.openrndr.animatable.Animatable
 import org.openrndr.animatable.easing.Easing
 import org.openrndr.draw.*
 import org.openrndr.extra.olive.oliveProgram
-import org.openrndr.extras.color.presets.CRIMSON
-import org.openrndr.extras.color.presets.MAROON
-import org.openrndr.extras.color.presets.MEDIUM_AQUAMARINE
+import org.openrndr.extras.color.presets.*
 
 fun main(args: Array<String>) {
     application {
@@ -17,6 +15,18 @@ fun main(args: Array<String>) {
         }
 
         oliveProgram {
+//            var rt = renderTarget(program.width, program.height) {
+//                colorBuffer()
+//            }
+
+            class FeedbackTarget(width: Int, height: Int) {
+                var backbuffer = renderTarget(width, height) { colorBuffer() }
+                var target = renderTarget(width, height) { colorBuffer() }
+                fun swapBuffers() { backbuffer = target.also { target = backbuffer } }
+            }
+
+            var fdbkTarget = FeedbackTarget(program.width, program.height)
+
             var funcs = """
                 vec2 rotate(vec2 space, vec2 center, float amount){
                     return vec2(cos(amount) * (space.x - center.x) + sin(amount) * (space.y - center.y) + center.x,
@@ -623,22 +633,33 @@ fun main(args: Array<String>) {
 
             """.trimIndent()
 
-            var shader1 =  {color1: ColorRGBa, color2: ColorRGBa, time: Double, freq: Double, rot: Double ->
+            var shader1 =  {color1: ColorRGBa, color2: ColorRGBa, time: Double, freq: Double, rot: Double, backbuffer: ColorBuffer ->
                 shadeStyle {
                     fragmentPreamble = funcs
                     fragmentTransform = """
                         vec2 uvN = c_boundsPosition.xy;
+//                        vec2 bbN = vec2(uvN.x, uvN.y);
+                        vec2 bbN = c_screenPosition.xy;
+                        bbN = vec2(bbN.x, u_viewDimensions.y - bbN.y);
+//                        bbN = mix(bbN, vec2(0.5), 0.001);
+                        vec4 bb = texture(p_backbuffer, bbN);
+                        
+                        
                         float t = p_time * 0.2 + p_freq*1000;
+                        
+                        // TODO: maybe use different uvs for snoise calls
                         vec2 nz = vec2(snoise(vec3(uvN, t)), snoise(vec3(uvN, t*0.9+100)));
                         float nz2  = snoise(vec3(uvN*8000, t))*0.25 + snoise(vec3(uvN*4000, t))*0.5 + snoise(vec3(uvN*2000, t));
       
                         
                         float radDist = distance(uvN+nz*0.1, vec2(0.5));
-                        vec4 outCol = mix(p_color1, p_color2, radDist*4-nz2*0.1);
+                        vec4 outCol = mix(p_color1, p_color2, radDist*4-nz2*0.01);
                         vec2 rot = rotate(uvN+nz, vec2(0.5), p_rot);
                         outCol.a = pow(1.-radDist*2, 2-sinN(p_time+rot.x*p_freq)*1.8);
-                        outCol.a *= pow(1.-radDist*2, 0.7);
+                        outCol.a *= pow(1.-radDist*2-nz2*0.05, 0.7);
 //                        outCol = vec4(nz2);
+//                        outCol = mix(outCol, bb, 0.8);
+                        outCol.rgb = mix(outCol.rgb, bb.rgb, 0.2);
                         x_fill = outCol;
                     """.trimIndent()
                     parameter("color1", color1)
@@ -646,6 +667,7 @@ fun main(args: Array<String>) {
                     parameter("time", time)
                     parameter("freq", freq)
                     parameter("rot", rot)
+                    parameter("backbuffer", backbuffer)
                 }
             }
 
@@ -659,16 +681,23 @@ fun main(args: Array<String>) {
 
 
             extend {
-                var sec = program.seconds
-                drawer.stroke = null
-                drawer.shadeStyle = shader1(ColorRGBa.CRIMSON, ColorRGBa.BLUE, sec, 3.0, 0.0)
-                drawer.circle(500.0, 500.0, 500.0)
+                fdbkTarget.swapBuffers()
+                var bb = fdbkTarget.backbuffer.colorBuffer(0)
+                drawer.isolatedWithTarget(fdbkTarget.target) {
+                    drawer.clear(ColorRGBa.TRANSPARENT)
+                    var sec = program.seconds
+                    drawer.stroke = null
 
-                drawer.shadeStyle = shader1(ColorRGBa.MEDIUM_AQUAMARINE, ColorRGBa.MAROON, sec, -2.3, 2.0)
-                drawer.circle(1500.0, 1200.0, 900.0)
+                    drawer.shadeStyle = shader1(ColorRGBa.CRIMSON, ColorRGBa.BLUE, sec, 3.0, 0.0, bb)
+                    drawer.circle(500.0, 500.0, 500.0)
 
-                drawer.shadeStyle = shader1(ColorRGBa.BLUE, ColorRGBa.MEDIUM_AQUAMARINE, sec, 3.3, 4.0)
-                drawer.circle(2900.0, 800.0, 700.0)
+                    drawer.shadeStyle = shader1(ColorRGBa.MEDIUM_AQUAMARINE.mix(ColorRGBa.MAROON, 0.15), ColorRGBa.MAROON, sec, -2.3, 2.0, bb)
+                    drawer.circle(1500.0, 1200.0, 900.0)
+
+                    drawer.shadeStyle = shader1(ColorRGBa.BLUE.mix(ColorRGBa.BROWN, 0.2), ColorRGBa.BURLY_WOOD.mix(ColorRGBa.BROWN, 0.8), sec, 3.3, 4.0, bb)
+                    drawer.circle(2900.0, 700.0, 700.0)
+                }
+                drawer.image(fdbkTarget.target.colorBuffer(0))
             }
             extend(FPSDisplay())
         }
